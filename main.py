@@ -17,8 +17,34 @@ from datetime import datetime
 import re
 
 def normalize_time(time_str: str) -> str:
-    """Convert various time formats to HH:MM (24-hour format)"""
+    """Convert various time formats (English & Arabic) to HH:MM (24-hour format)"""
     time_str = time_str.strip().lower()
+    
+    # Arabic time mappings
+    arabic_mappings = {
+        'صباحا': 'am',
+        'صباحاً': 'am',
+        'ص': 'am',
+        'مساء': 'pm',
+        'مساءً': 'pm',
+        'م': 'pm',
+        'الصباح': 'am',
+        'المساء': 'pm',
+        'ظهرا': 'pm',
+        'ظهراً': 'pm'
+    }
+    
+    # Replace Arabic time indicators with English
+    for arabic, english in arabic_mappings.items():
+        time_str = time_str.replace(arabic, english)
+    
+    # Convert Arabic numerals to English
+    arabic_to_english_nums = {
+        '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+        '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
+    }
+    for arabic_num, english_num in arabic_to_english_nums.items():
+        time_str = time_str.replace(arabic_num, english_num)
     
     # Handle times like "5pm", "5 pm", "5:00pm", "17:00"
     # Remove spaces between time and am/pm
