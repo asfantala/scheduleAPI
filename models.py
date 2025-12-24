@@ -4,7 +4,7 @@ from typing import Optional, List
 class AvailabilityRequest(BaseModel):
     service: str
     preferred_date: str
-    preferred_time: Optional[str] = None
+    preferred_time: str
 
 class TimeSlot(BaseModel):
     date: str
@@ -12,7 +12,12 @@ class TimeSlot(BaseModel):
 
 class AvailabilityResponse(BaseModel):
     available: bool
-    slots: List[TimeSlot]
+    requested_date: str
+    requested_time: str
+    service: str
+    duration_minutes: int
+    alternative_slots: List[TimeSlot]
+    message: str
 
 class BookingRequest(BaseModel):
     service: str
@@ -53,3 +58,7 @@ class AppointmentDetail(BaseModel):
     time: str
     insurance_provider: Optional[str] = None
     notes: Optional[str] = None
+
+class AllAppointmentsResponse(BaseModel):
+    total: int
+    appointments: List[AppointmentDetail]

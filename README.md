@@ -1,24 +1,32 @@
 # Dental Clinic Scheduling API
 
-A FastAPI-based RESTful API for managing dental clinic appointments with full CRUD operations and double-booking prevention.
+A production-ready FastAPI-based RESTful API for managing dental clinic appointments with realistic business logic, calendar-based scheduling, and comprehensive validation.
 
-## Features
+## 🌟 Features
 
-- ✅ Check appointment availability
-- ✅ Book appointments with conflict prevention
-- ✅ View appointment details
-- ✅ Update existing appointments
-- ✅ Cancel appointments
-- ✅ Flexible time format support (12hr/24hr)
-- ✅ Default values for optional fields
+### Core Functionality
+- ✅ **Calendar-based availability checking** - Real-time slot validation
+- ✅ **Smart appointment booking** - Service duration-aware scheduling
+- ✅ **View all appointments** - Admin dashboard support
+- ✅ **Update appointments** - Reschedule with conflict detection
+- ✅ **Cancel appointments** - 24-hour cancellation policy
+- ✅ **Conflict prevention** - No double-booking, duplicate patient detection
 
-## Tech Stack
+### Advanced Features
+- 🌍 **Arabic language support** - Time format handling (٢ مساءً, ٩ صباحا)
+- ⏰ **Flexible time formats** - 12hr/24hr (2:00 PM, 14:00, 2pm)
+- 📅 **Service duration handling** - Automatic multi-slot blocking
+- 🔒 **Business rules validation** - Advance booking limits, working hours
+- 🎯 **Smart alternatives** - Suggests available slots when requested time is taken
+
+## 🏗️ Tech Stack
 
 - **FastAPI** - Modern Python web framework
-- **Pydantic** - Data validation
-- **python-dateutil** - Flexible time parsing
+- **Pydantic** - Data validation and settings management
+- **python-dateutil** - Flexible date/time parsing
+- **Railway** - Cloud deployment platform
 
-## Installation
+## 📦 Installation
 
 ```bash
 # Clone the repository
@@ -28,63 +36,52 @@ cd scheduleAPI
 # Install dependencies
 pip install -r requirements.txt
 
-# Run the server
+# Run the development server
 uvicorn main:app --reload
 ```
 
-## API Documentation
+Server runs at: **http://localhost:8000**
 
-Once running, access:
+## 📚 API Documentation
+
+Interactive documentation available at:
 - **Swagger UI**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
 
-## Endpoints
+## 🔌 API Endpoints
 
-### 1. Check Availability
+### 1. Check Availability - `GET /check-availability`
 
-**POST** `/check-availability`
+Check if a specific date and time is available for a service.
 
-Check available time slots for a specific date.
+**Query Parameters:**
+- `service` - Service type (e.g., "Dental Cleaning", "Root Canal")
+- `preferred_date` - Date in YYYY-MM-DD format
+- `preferred_time` - Time in any format (14:00, 2:00 PM, 2pm, ٢ مساءً)
 
-**Request Body:**
-```json
-{
-  "service": "Dental Cleaning",
-  "preferred_date": "2026-01-20",
-  "preferred_time": "afternoon"
-}
+**Example:**
+```bash
+GET /check-availability?service=Root%20Canal&preferred_date=2026-01-20&preferred_time=2:00%20PM
 ```
 
-**Response:**
+**Response (Available):**
 ```json
 {
   "available": true,
-  "slots": [
-    {
-      "date": "2026-01-20",
-      "time": "09:00"
-    },
-    {
-      "date": "2026-01-20",
-      "time": "11:00"
-    },
-    {
-      "date": "2026-01-20",
-      "time": "14:00"
-    },
-    {
-      "date": "2026-01-20",
-      "time": "15:00"
-    }
-  ]
+  "requested_date": "2026-01-20",
+  "requested_time": "14:00",
+  "service": "Root Canal",
+  "duration_minutes": 90,
+  "alternative_slots": [],
+  "message": "Time slot 14:00 on 2026-01-20 is available for Root Canal (90 minutes)"
 }
 ```
 
-### 2. Book Appointment
+---
 
-**POST** `/book-appointment`
+### 2. Book Appointment - `POST /book-appointment`
 
-Create a new appointment. Prevents double-booking automatically.
+Create a new appointment with validation.
 
 **Request Body:**
 ```json
@@ -100,212 +97,199 @@ Create a new appointment. Prevents double-booking automatically.
 }
 ```
 
-**Response:**
-```json
-{
-  "success": true,
-  "appointment_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-}
+---
+
+### 3. Get All Appointments - `GET /appointments`
+
+Retrieve all booked appointments (admin endpoint).
+
+**Query Parameters:**
+- `date` (optional) - Filter by date (YYYY-MM-DD)
+
+**Example:**
+```bash
+GET /appointments?date=2026-01-20
 ```
 
-**Flexible Time Formats:**
-- `"14:00"` (24-hour)
-- `"2:00 PM"` (12-hour with space)
-- `"2pm"` (12-hour no space)
-- `"2:00pm"` (12-hour no space)
+---
 
-### 3. Get Appointment Details
+### 4. Get Appointment - `GET /appointment/{appointment_id}`
 
-**GET** `/appointment/{appointment_id}`
+Get specific appointment details.
 
-Retrieve details of a specific appointment.
+---
 
-**Response:**
-```json
-{
-  "appointment_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "service": "Dental Cleaning",
-  "patient_name": "John Doe",
-  "phone": "15550199",
-  "email": "john@example.com",
-  "appointment_date": "2026-01-20",
-  "time": "14:00",
-  "insurance_provider": "BlueCross",
-  "notes": "First-time patient"
-}
-```
-
-### 4. Update Appointment
-
-**PUT** `/update-appointment`
+### 5. Update Appointment - `PUT /update-appointment`
 
 Modify an existing appointment.
 
 **Request Body:**
 ```json
 {
-  "appointment_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "appointment_id": "a1b2c3d4-...",
   "appointment_date": "2026-01-21",
   "time": "10:00 AM",
-  "notes": "Rescheduled due to conflict"
+  "notes": "Rescheduled"
 }
 ```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Appointment a1b2c3d4-e5f6-7890-abcd-ef1234567890 updated successfully"
-}
-```
-
-### 5. Cancel Appointment
-
-**DELETE** `/cancel-appointment/{appointment_id}`
-
-Cancel and remove an appointment.
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Appointment a1b2c3d4-e5f6-7890-abcd-ef1234567890 cancelled successfully"
-}
-```
-
-## Sample Data
-
-The API includes pre-configured data:
-
-### Available Time Slots
-- **December 2025**: Dec 17, 18, 22, 23
-- **January 2026**: Multiple dates throughout the month
-
-### Sample Appointments
-Three pre-loaded appointments for testing:
-
-| ID | Patient | Service | Date | Time |
-|---|---|---|---|---|
-| `sample-appt-001` | Sarah Johnson | Dental Cleaning | 2026-01-20 | 09:00 |
-| `sample-appt-002` | Ahmed Ali | Root Canal | 2026-01-20 | 14:00 |
-| `sample-appt-003` | Layla Hassan | Teeth Whitening | 2026-01-21 | 10:30 |
-
-You can retrieve these using the GET endpoint:
-```bash
-curl -X 'GET' 'http://localhost:8000/appointment/sample-appt-001'
-```
-
-See `data.py` for complete details.
-
-## cURL Examples
-
-### Check Availability
-```bash
-curl -X 'POST' \
-  'http://localhost:8000/check-availability' \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "service": "Dental Cleaning",
-    "preferred_date": "2026-01-20"
-  }'
-```
-
-### Book Appointment
-```bash
-curl -X 'POST' \
-  'http://localhost:8000/book-appointment' \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "service": "Dental Cleaning",
-    "patient_name": "John Doe",
-    "phone": "15550199",
-    "email": "john@example.com",
-    "appointment_date": "2026-01-20",
-    "time": "2:00 PM",
-    "insurance_provider": "BlueCross",
-    "notes": "First-time patient"
-  }'
-```
-
-### Get Appointment
-```bash
-curl -X 'GET' \
-  'http://localhost:8000/appointment/{appointment_id}'
-```
-
-### Update Appointment
-```bash
-curl -X 'PUT' \
-  'http://localhost:8000/update-appointment' \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "appointment_id": "your-appointment-id",
-    "time": "3:00 PM"
-  }'
-```
-
-### Cancel Appointment
-```bash
-curl -X 'DELETE' \
-  'http://localhost:8000/cancel-appointment/{appointment_id}'
-```
-
-## Error Handling
-
-### 409 Conflict - Double Booking
-```json
-{
-  "detail": "Time slot 14:00 on 2026-01-20 is already booked"
-}
-```
-
-### 404 Not Found - Invalid Appointment ID
-```json
-{
-  "detail": "Appointment not found"
-}
-```
-
-## Default Values
-
-Optional fields have default values:
-- `email`: "no-email@clinic.com"
-- `insurance_provider`: "No Insurance"
-- `notes`: "No additional notes"
-
-## Deployment
-
-This API can be deployed on:
-- **Render** (recommended)
-- **Railway**
-- **Fly.io**
-- **Heroku**
-- **AWS EC2/Lightsail**
-- **DigitalOcean**
-- **Google Cloud Run**
-
-**Note**: Cannot be deployed on Netlify (requires persistent server).
-
-## Project Structure
-
-```
-scheduleAPI/
-├── main.py              # FastAPI application & endpoints
-├── models.py            # Pydantic schemas
-├── data.py              # Mock schedule & storage
-├── requirements.txt     # Python dependencies
-├── .gitignore          # Git ignore rules
-└── README.md           # This file
-```
-
-## License
-
-MIT License
-
-## Author
-
-Tala - [@asfantala](https://github.com/asfantala)
 
 ---
 
-**API Status**: ✅ Running on http://localhost:8000
+### 6. Cancel Appointment - `DELETE /cancel-appointment/{appointment_id}`
+
+Cancel an appointment (24-hour notice required).
+
+---
+
+## ⚙️ Configuration
+
+### Service Duration (config.py)
+```python
+SERVICE_DURATION = {
+    "Dental Cleaning": 30,      # 1 slot (30 min)
+    "Root Canal": 90,            # 3 slots (90 min)
+    "Teeth Whitening": 60,       # 2 slots (60 min)
+    "Filling": 45,
+    "Extraction": 45,
+    "Consultation": 30,
+    "Checkup": 30
+}
+```
+
+### Business Rules
+- **Clinic hours**: 9:00 AM - 6:00 PM
+- **Appointment slots**: 30-minute intervals
+- **Lunch break**: 12:00 PM - 1:00 PM (no bookings)
+- **Minimum advance**: 2 hours
+- **Maximum advance**: 90 days
+- **Cancellation policy**: 24 hours notice
+
+---
+
+## 📅 Sample Data
+
+10 mock appointments included for testing across January 2026:
+
+| Date | Time | Patient | Service |
+|------|------|---------|---------|
+| Jan 20 | 09:00 | Sarah Johnson | Dental Cleaning |
+| Jan 20 | 14:00 | Ahmed Ali | Root Canal |
+| Jan 21 | 10:00 | Layla Hassan | Teeth Whitening |
+| Jan 22 | 09:30 | Rania Samir | Checkup |
+| ... | ... | ... | ... |
+
+---
+
+## 🚀 Deployment
+
+**Live API**: https://web-production-b2126.up.railway.app
+
+### Deploy to Railway
+1. Push code to GitHub
+2. Connect repository to Railway
+3. Railway auto-deploys using Procfile
+4. Access API at generated URL
+
+---
+
+## 🧪 Testing
+
+**Check availability:**
+```bash
+curl "http://localhost:8000/check-availability?service=Dental%20Cleaning&preferred_date=2026-01-20&preferred_time=09:00"
+```
+
+**Book appointment:**
+```bash
+curl -X POST http://localhost:8000/book-appointment \
+  -H "Content-Type: application/json" \
+  -d '{"service":"Dental Cleaning","patient_name":"John","phone":"123","email":"j@ex.com","appointment_date":"2026-01-20","time":"15:00"}'
+```
+
+**Get all appointments:**
+```bash
+curl http://localhost:8000/appointments
+```
+
+---
+
+## 🏗️ Project Structure
+
+```
+scheduleAPI/
+├── main.py              # FastAPI app & endpoints
+├── models.py            # Pydantic schemas
+├── data.py              # Schedule & appointments
+├── config.py            # Service durations & rules
+├── requirements.txt     # Dependencies
+├── Procfile            # Railway config
+└── README.md           # Documentation
+```
+
+---
+
+## 🔒 Business Logic
+
+### Calendar-Based Scheduling
+- Validates date/time exists in clinic schedule
+- Checks patient duplicate bookings
+- Calculates required consecutive slots
+- Prevents overlapping appointments
+
+### Service Duration Example
+**Root Canal (90 min)**:
+- Books at 14:00 → Blocks 14:00, 14:30, 15:00
+- Next available: 15:30
+
+### Smart Alternatives
+- If requested slot unavailable, suggests up to 5 alternatives
+- Considers service duration for all suggestions
+
+---
+
+## 🌍 Arabic Support
+
+Handles various Arabic formats:
+- Arabic numerals: ٠-٩ → 0-9
+- Time indicators: صباحا/مساءً → am/pm
+- **Example**: `٢:٣٠ مساءً` → `14:30`
+
+---
+
+## ❌ Error Handling
+
+- **400**: Invalid format, booking rules violated
+- **404**: Appointment not found
+- **409**: Slot already booked, patient duplicate
+
+---
+
+## 🎯 Realistic Features
+
+✅ Single dental room (no simultaneous bookings)  
+✅ Service duration-aware  
+✅ Business hours enforcement  
+✅ Lunch break handling  
+✅ Advance booking rules  
+✅ Cancellation policy  
+✅ Duplicate prevention  
+
+---
+
+## 📝 License
+
+MIT License
+
+## 👤 Author
+
+**Tala** - [@asfantala](https://github.com/asfantala)
+
+## 🔗 Links
+
+- **Repository**: https://github.com/asfantala/scheduleAPI
+- **Live API**: https://web-production-b2126.up.railway.app
+- **Docs**: https://web-production-b2126.up.railway.app/docs
+
+---
+
+**Status**: ✅ Production-Ready | 🚀 Deployed on Railway

@@ -1,6 +1,5 @@
 from fastapi import FastAPI, HTTPException
 from models import (
-    AvailabilityRequest,
     AvailabilityResponse,
     BookingRequest,
     BookingResponse,
@@ -8,10 +7,12 @@ from models import (
     UpdateRequest,
     UpdateResponse,
     DeleteResponse,
-    AppointmentDetail
+    AppointmentDetail,
+    AllAppointmentsResponse
 )
 from data import SCHEDULE, APPOINTMENTS
 from config import SERVICE_DURATION, MIN_ADVANCE_HOURS, MAX_ADVANCE_DAYS, CANCELLATION_HOURS
+from typing import Optional, List
 import uuid
 from dateutil import parser
 from datetime import datetime, timedelta
@@ -43,6 +44,21 @@ def validate_booking_time(appointment_date: str, appointment_time: str) -> None:
         raise HTTPException(status_code=400, detail="Invalid date or time format. Use YYYY-MM-DD for date and HH:MM for time")
     
     now = datetime.now()
+    
+    # Check if date exists in schedule
+    if appointment_date not in SCHEDULE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No appointments available on {appointment_date}. Please check available dates."
+        )
+    
+    # Check if time slot exists in schedule for this date
+    available_times = SCHEDULE.get(appointment_date, [])
+    if appointment_time not in available_times:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Time {appointment_time} is not available on {appointment_date}. Available times: {', '.join(available_times)}"
+        )
     
     # Check minimum advance notice
     min_booking_time = now + timedelta(hours=MIN_ADVANCE_HOURS)
@@ -157,25 +173,111 @@ def normalize_time(time_str: str) -> str:
 
 app = FastAPI(title="Dental Clinic API")
 
-@app.post("/check-availability", response_model=AvailabilityResponse)
-def check_availability(req: AvailabilityRequest):
-    slots = []
-    all_times = SCHEDULE.get(req.preferred_date, [])
+@app.get("/check-availability", response_model=AvailabilityResponse)
+def check_availability(
+    service: str,
+    preferred_date: str,
+    preferred_time: str
+):
+    """Check if a specific date and time is available for a service"""
     
-    # Filter out already booked times
-    booked_times = [
-        appt["time"] for appt in APPOINTMENTS.values() 
-        if appt["appointment_date"] == req.preferred_date
-    ]
+    # Normalize the requested time
+    normalized_time = normalize_time(preferred_time)
     
-    # Only show available times
-    for t in all_times:
-        if t not in booked_times:
-            slots.append(TimeSlot(date=req.preferred_date, time=t))
+    # Get service duration
+    service_duration = get_service_duration(service)
     
+    # Check if date exists in schedule
+    if preferred_date not in SCHEDULE:
+        return AvailabilityResponse(
+            available=False,
+            requested_date=preferred_date,
+            requested_time=normalized_time,
+            service=service,
+            duration_minutes=service_duration,
+            alternative_slots=[],
+            message=f"Clinic is closed on {preferred_date}. No appointments available."
+        )
+    
+    all_times = SCHEDULE[preferred_date]
+    
+    # Check if requested time exists in schedule
+    if normalized_time not in all_times:
+        return AvailabilityResponse(
+            available=False,
+            requested_date=preferred_date,
+            requested_time=normalized_time,
+            service=service,
+            duration_minutes=service_duration,
+            alternative_slots=[],
+            message=f"Time {normalized_time} is not in clinic hours. Available times: {', '.join(all_times[:5])}..."
+        )
+    
+    # Calculate required consecutive slots
+    try:
+        required_slots = calculate_required_slots(service, normalized_time)
+    except:
+        return AvailabilityResponse(
+            available=False,
+            requested_date=preferred_date,
+            requested_time=normalized_time,
+            service=service,
+            duration_minutes=service_duration,
+            alternative_slots=[],
+            message="Invalid time format"
+        )
+    
+    # Check all required slots exist in schedule
+    for slot in required_slots:
+        if slot not in all_times:
+            return AvailabilityResponse(
+                available=False,
+                requested_date=preferred_date,
+                requested_time=normalized_time,
+                service=service,
+                duration_minutes=service_duration,
+                alternative_slots=[],
+                message=f"Service requires {service_duration} minutes but not enough time available at {normalized_time}"
+            )
+    
+    # Get all booked time slots for this date
+    booked_slots = set()
+    for appt in APPOINTMENTS.values():
+        if appt["appointment_date"] == preferred_date:
+            occupied_slots = calculate_required_slots(appt["service"], appt["time"])
+            booked_slots.update(occupied_slots)
+    
+    # Check if any required slot is already booked
+    conflict_slots = [slot for slot in required_slots if slot in booked_slots]
+    
+    # Find all available slots for the requested day
+    all_available_slots = []
+    for start_time in all_times:
+        alt_slots = calculate_required_slots(service, start_time)
+        if all(slot in all_times for slot in alt_slots) and \
+           not any(slot in booked_slots for slot in alt_slots):
+            all_available_slots.append(TimeSlot(date=preferred_date, time=start_time))
+    
+    if conflict_slots:
+        return AvailabilityResponse(
+            available=False,
+            requested_date=preferred_date,
+            requested_time=normalized_time,
+            service=service,
+            duration_minutes=service_duration,
+            alternative_slots=all_available_slots,
+            message=f"Time slot {normalized_time} is already booked. {len(all_available_slots)} available slot(s) on this day."
+        )
+    
+    # Slot is available!
     return AvailabilityResponse(
-        available=len(slots) > 0,
-        slots=slots
+        available=True,
+        requested_date=preferred_date,
+        requested_time=normalized_time,
+        service=service,
+        duration_minutes=service_duration,
+        alternative_slots=all_available_slots,
+        message=f"Time slot {normalized_time} is available. Total {len(all_available_slots)} available slot(s) on {preferred_date}."
     )
 
 @app.post("/book-appointment", response_model=BookingResponse)
@@ -209,6 +311,29 @@ def book_appointment(req: BookingRequest):
     return BookingResponse(
         success=True,
         appointment_id=appointment_id
+    )
+
+@app.get("/appointments", response_model=AllAppointmentsResponse)
+def get_all_appointments(date: Optional[str] = None):
+    """Get all booked appointments, optionally filtered by date"""
+    appointments_list = []
+    
+    for appt_id, appt in APPOINTMENTS.items():
+        # Filter by date if provided
+        if date and appt["appointment_date"] != date:
+            continue
+            
+        appointments_list.append(AppointmentDetail(
+            appointment_id=appt_id,
+            **appt
+        ))
+    
+    # Sort by date and time
+    appointments_list.sort(key=lambda x: (x.appointment_date, x.time))
+    
+    return AllAppointmentsResponse(
+        total=len(appointments_list),
+        appointments=appointments_list
     )
 
 @app.get("/appointment/{appointment_id}", response_model=AppointmentDetail)
