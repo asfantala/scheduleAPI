@@ -25,7 +25,7 @@ class BookingRequest(BaseModel):
     phone: str
     email: Optional[str] = "no-email@clinic.com"
     appointment_date: str
-    time: str
+    time: Optional[str] = None  # Optional - can use ISO datetime in appointment_date instead
     insurance_provider: Optional[str] = "No Insurance"
     notes: Optional[str] = "No additional notes"
 

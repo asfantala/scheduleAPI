@@ -280,19 +280,35 @@ def check_availability(
         message=f"Time slot {normalized_time} is available. Total {len(all_available_slots)} available slot(s) on {preferred_date}."
     )
 
-@app.post("/book-appointment", response_model=BookingResponse)
+@app.post("/book-appointment", response_model=BookingResponse, status_code=201)
 def book_appointment(req: BookingRequest):
+    # Handle ISO 8601 datetime format (e.g., "2025-11-20T14:00:00Z")
+    if req.time is None:
+        # Parse ISO datetime from appointment_date
+        try:
+            dt = parser.isoparse(req.appointment_date)
+            appointment_date = dt.strftime("%Y-%m-%d")
+            appointment_time = dt.strftime("%H:%M")
+        except:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid datetime format. Use either ISO 8601 (e.g., '2025-11-20T14:00:00Z') or separate date and time fields"
+            )
+    else:
+        appointment_date = req.appointment_date
+        appointment_time = req.time
+    
     # Normalize time format
-    normalized_time = normalize_time(req.time)
+    normalized_time = normalize_time(appointment_time)
     
     # Validate business rules
-    validate_booking_time(req.appointment_date, normalized_time)
+    validate_booking_time(appointment_date, normalized_time)
     
     # Check patient doesn't have conflicting appointment
-    check_patient_existing_appointments(req.phone, req.email, req.appointment_date, normalized_time)
+    check_patient_existing_appointments(req.phone, req.email, appointment_date, normalized_time)
     
     # Check all required slots are available based on service duration
-    check_slot_availability(req.service, req.appointment_date, normalized_time)
+    check_slot_availability(req.service, appointment_date, normalized_time)
     
     appointment_id = str(uuid.uuid4())
     
@@ -302,7 +318,7 @@ def book_appointment(req: BookingRequest):
         "patient_name": req.patient_name,
         "phone": req.phone,
         "email": req.email,
-        "appointment_date": req.appointment_date,
+        "appointment_date": appointment_date,
         "time": normalized_time,
         "insurance_provider": req.insurance_provider,
         "notes": req.notes
@@ -312,6 +328,11 @@ def book_appointment(req: BookingRequest):
         success=True,
         appointment_id=appointment_id
     )
+
+@app.post("/bookings/dentist", response_model=BookingResponse, status_code=201)
+def book_dentist_appointment(req: BookingRequest):
+    """Alias endpoint for hackathon compatibility - calls book_appointment"""
+    return book_appointment(req)
 
 @app.get("/appointments", response_model=AllAppointmentsResponse)
 def get_all_appointments(date: Optional[str] = None):
