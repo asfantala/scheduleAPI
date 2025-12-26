@@ -176,36 +176,36 @@ app = FastAPI(title="Dental Clinic API")
 @app.get("/check-availability", response_model=AvailabilityResponse)
 def check_availability(
     service: str,
-    preferred_date: str,
-    preferred_time: str
+    appointment_date: str,
+    time: str
 ):
     """Check if a specific date and time is available for a service"""
     
     # Normalize the requested time
-    normalized_time = normalize_time(preferred_time)
+    normalized_time = normalize_time(time)
     
     # Get service duration
     service_duration = get_service_duration(service)
     
     # Check if date exists in schedule
-    if preferred_date not in SCHEDULE:
+    if appointment_date not in SCHEDULE:
         return AvailabilityResponse(
             available=False,
-            requested_date=preferred_date,
+            requested_date=appointment_date,
             requested_time=normalized_time,
             service=service,
             duration_minutes=service_duration,
             alternative_slots=[],
-            message=f"Clinic is closed on {preferred_date}. No appointments available."
+            message=f"Clinic is closed on {appointment_date}. No appointments available."
         )
     
-    all_times = SCHEDULE[preferred_date]
+    all_times = SCHEDULE[appointment_date]
     
     # Check if requested time exists in schedule
     if normalized_time not in all_times:
         return AvailabilityResponse(
             available=False,
-            requested_date=preferred_date,
+            requested_date=appointment_date,
             requested_time=normalized_time,
             service=service,
             duration_minutes=service_duration,
@@ -219,7 +219,7 @@ def check_availability(
     except:
         return AvailabilityResponse(
             available=False,
-            requested_date=preferred_date,
+            requested_date=appointment_date,
             requested_time=normalized_time,
             service=service,
             duration_minutes=service_duration,
@@ -232,7 +232,7 @@ def check_availability(
         if slot not in all_times:
             return AvailabilityResponse(
                 available=False,
-                requested_date=preferred_date,
+                requested_date=appointment_date,
                 requested_time=normalized_time,
                 service=service,
                 duration_minutes=service_duration,
@@ -243,7 +243,7 @@ def check_availability(
     # Get all booked time slots for this date
     booked_slots = set()
     for appt in APPOINTMENTS.values():
-        if appt["appointment_date"] == preferred_date:
+        if appt["appointment_date"] == appointment_date:
             occupied_slots = calculate_required_slots(appt["service"], appt["time"])
             booked_slots.update(occupied_slots)
     
@@ -256,12 +256,12 @@ def check_availability(
         alt_slots = calculate_required_slots(service, start_time)
         if all(slot in all_times for slot in alt_slots) and \
            not any(slot in booked_slots for slot in alt_slots):
-            all_available_slots.append(TimeSlot(date=preferred_date, time=start_time))
+            all_available_slots.append(TimeSlot(date=appointment_date, time=start_time))
     
     if conflict_slots:
         return AvailabilityResponse(
             available=False,
-            requested_date=preferred_date,
+            requested_date=appointment_date,
             requested_time=normalized_time,
             service=service,
             duration_minutes=service_duration,
@@ -272,12 +272,12 @@ def check_availability(
     # Slot is available!
     return AvailabilityResponse(
         available=True,
-        requested_date=preferred_date,
+        requested_date=appointment_date,
         requested_time=normalized_time,
         service=service,
         duration_minutes=service_duration,
         alternative_slots=all_available_slots,
-        message=f"Time slot {normalized_time} is available. Total {len(all_available_slots)} available slot(s) on {preferred_date}."
+        message=f"Time slot {normalized_time} is available. Total {len(all_available_slots)} available slot(s) on {appointment_date}."
     )
 
 @app.post("/book-appointment", response_model=BookingResponse, status_code=201)
