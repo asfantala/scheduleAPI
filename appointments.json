@@ -1,0 +1,112 @@
+{
+  "sample-appt-001": {
+    "service": "Dental Cleaning",
+    "patient_name": "Sarah Johnson",
+    "phone": "0791234567",
+    "email": "sarah.j@example.com",
+    "appointment_date": "2026-01-20",
+    "time": "09:00",
+    "insurance_provider": "BlueCross",
+    "notes": "Regular checkup"
+  },
+  "sample-appt-002": {
+    "service": "Root Canal",
+    "patient_name": "Ahmed Ali",
+    "phone": "0795555123",
+    "email": "ahmed@example.com",
+    "appointment_date": "2026-01-20",
+    "time": "14:00",
+    "insurance_provider": "HealthPlus",
+    "notes": "Follow-up appointment"
+  },
+  "sample-appt-003": {
+    "service": "Teeth Whitening",
+    "patient_name": "Layla Hassan",
+    "phone": "0797777888",
+    "email": "layla.h@example.com",
+    "appointment_date": "2026-01-21",
+    "time": "10:00",
+    "insurance_provider": "No Insurance",
+    "notes": "First visit"
+  },
+  "sample-appt-004": {
+    "service": "Filling",
+    "patient_name": "Mohammad Khalil",
+    "phone": "0798881234",
+    "email": "mohammad.k@example.com",
+    "appointment_date": "2026-01-21",
+    "time": "14:30",
+    "insurance_provider": "MediCare",
+    "notes": "Cavity on upper right molar"
+  },
+  "sample-appt-005": {
+    "service": "Checkup",
+    "patient_name": "Rania Samir",
+    "phone": "0799992345",
+    "email": "rania.s@example.com",
+    "appointment_date": "2026-01-22",
+    "time": "09:30",
+    "insurance_provider": "BlueCross",
+    "notes": "Annual checkup"
+  },
+  "sample-appt-006": {
+    "service": "Extraction",
+    "patient_name": "Karim Nasser",
+    "phone": "0790003456",
+    "email": "karim.n@example.com",
+    "appointment_date": "2026-01-22",
+    "time": "13:00",
+    "insurance_provider": "HealthPlus",
+    "notes": "Wisdom tooth removal"
+  },
+  "sample-appt-007": {
+    "service": "Dental Cleaning",
+    "patient_name": "Nour Khalil",
+    "phone": "0791114567",
+    "email": "nour.k@example.com",
+    "appointment_date": "2026-01-26",
+    "time": "10:30",
+    "insurance_provider": "No Insurance",
+    "notes": "Deep cleaning requested"
+  },
+  "sample-appt-008": {
+    "service": "Root Canal",
+    "patient_name": "Omar Fares",
+    "phone": "0792225678",
+    "email": "omar.f@example.com",
+    "appointment_date": "2026-01-27",
+    "time": "09:00",
+    "insurance_provider": "MediCare",
+    "notes": "Severe tooth pain"
+  },
+  "sample-appt-009": {
+    "service": "Teeth Whitening",
+    "patient_name": "Dina Mahmoud",
+    "phone": "0793336789",
+    "email": "dina.m@example.com",
+    "appointment_date": "2026-01-28",
+    "time": "15:00",
+    "insurance_provider": "BlueCross",
+    "notes": "Wedding preparation"
+  },
+  "sample-appt-010": {
+    "service": "Consultation",
+    "patient_name": "Tariq Zayed",
+    "phone": "0794447890",
+    "email": "tariq.z@example.com",
+    "appointment_date": "2026-01-29",
+    "time": "13:30",
+    "insurance_provider": "HealthPlus",
+    "notes": "Braces consultation"
+  },
+  "ce1f802d-281d-4eb5-91f2-da7f781b4c69": {
+    "service": "tala df",
+    "patient_name": "df efdfsdg",
+    "phone": "0795383053",
+    "email": "no-email@clinic.com",
+    "appointment_date": "2026-01-20",
+    "time": "10:00",
+    "insurance_provider": "No Insurance",
+    "notes": ""
+  }
+}

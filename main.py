@@ -1,18 +1,16 @@
 from fastapi import FastAPI, HTTPException
 from models import (
-    AvailabilityResponse,
     BookingRequest,
     BookingResponse,
-    TimeSlot,
     UpdateRequest,
     UpdateResponse,
     DeleteResponse,
     AppointmentDetail,
     AllAppointmentsResponse
 )
-from data import SCHEDULE, APPOINTMENTS
+from data import SCHEDULE, APPOINTMENTS, save_appointments
 from config import SERVICE_DURATION, MIN_ADVANCE_HOURS, MAX_ADVANCE_DAYS, CANCELLATION_HOURS
-from typing import Optional, List
+from typing import Optional
 import uuid
 from dateutil import parser
 from datetime import datetime, timedelta
@@ -40,7 +38,7 @@ def validate_booking_time(appointment_date: str, appointment_time: str) -> None:
     """Validate booking follows business rules"""
     try:
         appt_datetime = datetime.strptime(f"{appointment_date} {appointment_time}", "%Y-%m-%d %H:%M")
-    except:
+    except Exception:
         raise HTTPException(status_code=400, detail="Invalid date or time format. Use YYYY-MM-DD for date and HH:MM for time")
     
     now = datetime.now()
@@ -167,152 +165,42 @@ def normalize_time(time_str: str) -> str:
         # Parse the time string
         parsed_time = parser.parse(time_str, fuzzy=True)
         return parsed_time.strftime("%H:%M")
-    except:
+    except Exception:
         # If parsing fails, return as-is
         return time_str
 
-app = FastAPI(title="Dental Clinic API")
+app = FastAPI(
+    title="Dental Appointment API",
+    description="Simple API - Only 4 endpoints you need",
+    version="1.0.0"
+)
 
-@app.get("/check-availability", response_model=AvailabilityResponse)
-def check_availability(
-    service: str,
-    appointment_date: str,
-    time: str
-):
-    """Check if a specific date and time is available for a service"""
-    
-    # Normalize the requested time
-    normalized_time = normalize_time(time)
-    
-    # Get service duration
-    service_duration = get_service_duration(service)
-    
-    # Check if date exists in schedule
-    if appointment_date not in SCHEDULE:
-        return AvailabilityResponse(
-            available=False,
-            requested_date=appointment_date,
-            requested_time=normalized_time,
-            service=service,
-            duration_minutes=service_duration,
-            alternative_slots=[],
-            message=f"Clinic is closed on {appointment_date}. No appointments available."
-        )
-    
-    all_times = SCHEDULE[appointment_date]
-    
-    # Check if requested time exists in schedule
-    if normalized_time not in all_times:
-        return AvailabilityResponse(
-            available=False,
-            requested_date=appointment_date,
-            requested_time=normalized_time,
-            service=service,
-            duration_minutes=service_duration,
-            alternative_slots=[],
-            message=f"Time {normalized_time} is not in clinic hours. Available times: {', '.join(all_times[:5])}..."
-        )
-    
-    # Calculate required consecutive slots
-    try:
-        required_slots = calculate_required_slots(service, normalized_time)
-    except:
-        return AvailabilityResponse(
-            available=False,
-            requested_date=appointment_date,
-            requested_time=normalized_time,
-            service=service,
-            duration_minutes=service_duration,
-            alternative_slots=[],
-            message="Invalid time format"
-        )
-    
-    # Check all required slots exist in schedule
-    for slot in required_slots:
-        if slot not in all_times:
-            return AvailabilityResponse(
-                available=False,
-                requested_date=appointment_date,
-                requested_time=normalized_time,
-                service=service,
-                duration_minutes=service_duration,
-                alternative_slots=[],
-                message=f"Service requires {service_duration} minutes but not enough time available at {normalized_time}"
-            )
-    
-    # Get all booked time slots for this date
-    booked_slots = set()
-    for appt in APPOINTMENTS.values():
-        if appt["appointment_date"] == appointment_date:
-            occupied_slots = calculate_required_slots(appt["service"], appt["time"])
-            booked_slots.update(occupied_slots)
-    
-    # Check if any required slot is already booked
-    conflict_slots = [slot for slot in required_slots if slot in booked_slots]
-    
-    # Find all available slots for the requested day
-    all_available_slots = []
-    for start_time in all_times:
-        alt_slots = calculate_required_slots(service, start_time)
-        if all(slot in all_times for slot in alt_slots) and \
-           not any(slot in booked_slots for slot in alt_slots):
-            all_available_slots.append(TimeSlot(date=appointment_date, time=start_time))
-    
-    if conflict_slots:
-        return AvailabilityResponse(
-            available=False,
-            requested_date=appointment_date,
-            requested_time=normalized_time,
-            service=service,
-            duration_minutes=service_duration,
-            alternative_slots=all_available_slots,
-            message=f"Time slot {normalized_time} is already booked. {len(all_available_slots)} available slot(s) on this day."
-        )
-    
-    # Slot is available!
-    return AvailabilityResponse(
-        available=True,
-        requested_date=appointment_date,
-        requested_time=normalized_time,
-        service=service,
-        duration_minutes=service_duration,
-        alternative_slots=all_available_slots,
-        message=f"Time slot {normalized_time} is available. Total {len(all_available_slots)} available slot(s) on {appointment_date}."
-    )
+# ============================================================================
+# 4 SIMPLE ENDPOINTS
+# ============================================================================
 
-@app.post("/book-appointment", response_model=BookingResponse, status_code=201)
-def book_appointment(req: BookingRequest):
-    # Handle ISO 8601 datetime format (e.g., "2025-11-20T14:00:00Z")
-    if req.time is None:
-        # Parse ISO datetime from appointment_date
-        try:
-            dt = parser.isoparse(req.appointment_date)
-            appointment_date = dt.strftime("%Y-%m-%d")
-            appointment_time = dt.strftime("%H:%M")
-        except:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid datetime format. Use either ISO 8601 (e.g., '2025-11-20T14:00:00Z') or separate date and time fields"
-            )
-    else:
-        appointment_date = req.appointment_date
-        appointment_time = req.time
+@app.post("/appointments", response_model=BookingResponse, status_code=201)
+def create_appointment(req: BookingRequest):
+    """
+    📅 Book a new dental appointment
+    
+    Required: service, patient_name, phone, appointment_date, time
+    """
+    appointment_date = req.appointment_date
+    appointment_time = req.time
     
     # Normalize time format
     normalized_time = normalize_time(appointment_time)
     
     # Validate business rules
     validate_booking_time(appointment_date, normalized_time)
-    
-    # Check patient doesn't have conflicting appointment
     check_patient_existing_appointments(req.phone, req.email, appointment_date, normalized_time)
-    
-    # Check all required slots are available based on service duration
     check_slot_availability(req.service, appointment_date, normalized_time)
     
+    # Generate unique appointment ID
     appointment_id = str(uuid.uuid4())
     
-    # Store appointment with normalized time
+    # Store appointment
     APPOINTMENTS[appointment_id] = {
         "service": req.service,
         "patient_name": req.patient_name,
@@ -323,57 +211,45 @@ def book_appointment(req: BookingRequest):
         "insurance_provider": req.insurance_provider,
         "notes": req.notes
     }
+    
+    # Save to JSON file
+    save_appointments(APPOINTMENTS)
 
-    return BookingResponse(
-        success=True,
-        appointment_id=appointment_id
-    )
+    return BookingResponse(success=True, appointment_id=appointment_id)
 
-@app.post("/bookings/dentist", response_model=BookingResponse, status_code=201)
-def book_dentist_appointment(req: BookingRequest):
-    """Alias endpoint for hackathon compatibility - calls book_appointment"""
-    return book_appointment(req)
 
 @app.get("/appointments", response_model=AllAppointmentsResponse)
-def get_all_appointments(date: Optional[str] = None):
-    """Get all booked appointments, optionally filtered by date"""
+def get_appointments(date: Optional[str] = None):
+    """
+    📋 Get all appointments (optionally filter by date)
+    
+    Example: /appointments?date=2026-01-20
+    """
     appointments_list = []
     
     for appt_id, appt in APPOINTMENTS.items():
-        # Filter by date if provided
         if date and appt["appointment_date"] != date:
             continue
             
-        appointments_list.append(AppointmentDetail(
-            appointment_id=appt_id,
-            **appt
-        ))
+        appointments_list.append(AppointmentDetail(appointment_id=appt_id, **appt))
     
-    # Sort by date and time
     appointments_list.sort(key=lambda x: (x.appointment_date, x.time))
     
-    return AllAppointmentsResponse(
-        total=len(appointments_list),
-        appointments=appointments_list
-    )
+    return AllAppointmentsResponse(total=len(appointments_list), appointments=appointments_list)
 
-@app.get("/appointment/{appointment_id}", response_model=AppointmentDetail)
-def get_appointment(appointment_id: str):
+
+@app.put("/appointments/{appointment_id}", response_model=UpdateResponse)
+def update_appointment(appointment_id: str, req: UpdateRequest):
+    """
+    ✏️ Update an existing appointment
+    
+    Can update: appointment_date, time, insurance_provider, notes
+    """
     if appointment_id not in APPOINTMENTS:
         raise HTTPException(status_code=404, detail="Appointment not found")
     
     appointment = APPOINTMENTS[appointment_id]
-    return AppointmentDetail(
-        appointment_id=appointment_id,
-        **appointment
-    )
-
-@app.put("/update-appointment", response_model=UpdateResponse)
-def update_appointment(req: UpdateRequest):
-    if req.appointment_id not in APPOINTMENTS:
-        raise HTTPException(status_code=404, detail="Appointment not found")
-    
-    appointment = APPOINTMENTS[req.appointment_id]
+    req.appointment_id = appointment_id  # Set the ID from path
     
     # Get current or updated values
     new_date = req.appointment_date if req.appointment_date else appointment["appointment_date"]
@@ -382,20 +258,11 @@ def update_appointment(req: UpdateRequest):
     
     # If date or time is being changed, validate
     if req.appointment_date or req.time:
-        # Validate business rules
         validate_booking_time(new_date, new_time)
-        
-        # Check patient doesn't have conflicting appointment
         check_patient_existing_appointments(
-            appointment["phone"], 
-            appointment["email"], 
-            new_date, 
-            new_time,
-            exclude_id=req.appointment_id
+            appointment["phone"], appointment["email"], new_date, new_time, exclude_id=appointment_id
         )
-        
-        # Check slot availability (excluding current appointment)
-        check_slot_availability(service, new_date, new_time, exclude_id=req.appointment_id)
+        check_slot_availability(service, new_date, new_time, exclude_id=appointment_id)
     
     # Update fields
     if req.appointment_date:
@@ -407,13 +274,18 @@ def update_appointment(req: UpdateRequest):
     if req.notes is not None:
         appointment["notes"] = req.notes
     
-    return UpdateResponse(
-        success=True,
-        message=f"Appointment {req.appointment_id} updated successfully"
-    )
+    save_appointments(APPOINTMENTS)
+    
+    return UpdateResponse(success=True, message="Appointment updated successfully")
 
-@app.delete("/cancel-appointment/{appointment_id}", response_model=DeleteResponse)
-def cancel_appointment(appointment_id: str):
+
+@app.delete("/appointments/{appointment_id}", response_model=DeleteResponse)
+def delete_appointment(appointment_id: str):
+    """
+    🗑️ Cancel an appointment
+    
+    Must cancel at least 24 hours in advance
+    """
     if appointment_id not in APPOINTMENTS:
         raise HTTPException(status_code=404, detail="Appointment not found")
     
@@ -422,24 +294,21 @@ def cancel_appointment(appointment_id: str):
     # Check cancellation policy
     try:
         appt_datetime = datetime.strptime(
-            f"{appointment['appointment_date']} {appointment['time']}", 
-            "%Y-%m-%d %H:%M"
+            f"{appointment['appointment_date']} {appointment['time']}", "%Y-%m-%d %H:%M"
         )
         min_cancel_time = appt_datetime - timedelta(hours=CANCELLATION_HOURS)
         
         if datetime.now() > min_cancel_time:
             raise HTTPException(
                 status_code=400,
-                detail=f"Appointments must be cancelled at least {CANCELLATION_HOURS} hours in advance"
+                detail=f"Must cancel at least {CANCELLATION_HOURS} hours in advance"
             )
     except HTTPException:
         raise
-    except:
-        pass  # If date parsing fails, allow cancellation
+    except Exception:
+        pass
     
     del APPOINTMENTS[appointment_id]
+    save_appointments(APPOINTMENTS)
     
-    return DeleteResponse(
-        success=True,
-        message=f"Appointment {appointment_id} cancelled successfully"
-    )
+    return DeleteResponse(success=True, message="Appointment cancelled successfully")

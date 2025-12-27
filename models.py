@@ -19,15 +19,16 @@ class AvailabilityResponse(BaseModel):
     alternative_slots: List[TimeSlot]
     message: str
 
+# Simple booking request - only required fields
 class BookingRequest(BaseModel):
     service: str
     patient_name: str
     phone: str
-    email: Optional[str] = "no-email@clinic.com"
     appointment_date: str
-    time: Optional[str] = None  # Optional - can use ISO datetime in appointment_date instead
+    time: str
+    email: Optional[str] = "no-email@clinic.com"
     insurance_provider: Optional[str] = "No Insurance"
-    notes: Optional[str] = "No additional notes"
+    notes: Optional[str] = ""
 
 class BookingResponse(BaseModel):
     success: bool

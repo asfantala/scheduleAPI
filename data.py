@@ -1,4 +1,8 @@
-from datetime import datetime
+import json
+import os
+
+# Path to appointments JSON file
+APPOINTMENTS_FILE = "appointments.json"
 
 SCHEDULE = {
     # December 2025 (9:00 AM - 6:00 PM, 30-minute slots)
@@ -129,3 +133,29 @@ APPOINTMENTS = {
         "notes": "Braces consultation"
     }
 }
+
+# Load appointments from JSON file if exists
+def load_appointments():
+    """Load appointments from JSON file"""
+    if os.path.exists(APPOINTMENTS_FILE):
+        try:
+            with open(APPOINTMENTS_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Error loading appointments: {e}")
+            return APPOINTMENTS.copy()
+    else:
+        # Create initial file with sample data
+        save_appointments(APPOINTMENTS)
+        return APPOINTMENTS.copy()
+
+def save_appointments(appointments_dict):
+    """Save appointments to JSON file"""
+    try:
+        with open(APPOINTMENTS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(appointments_dict, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"Error saving appointments: {e}")
+
+# Initialize APPOINTMENTS from file
+APPOINTMENTS = load_appointments()
