@@ -218,24 +218,29 @@ def create_appointment(req: BookingRequest):
     return BookingResponse(success=True, appointment_id=appointment_id)
 
 
-@app.get("/appointments", response_model=AllAppointmentsResponse)
+@app.get("/appointments")
 def get_appointments(date: Optional[str] = None):
     """
     📋 Get all appointments (optionally filter by date)
     
     Example: /appointments?date=2026-01-20
     """
-    appointments_list = []
+    if date:
+        # Filter by date
+        filtered = {
+            appt_id: appt 
+            for appt_id, appt in APPOINTMENTS.items() 
+            if appt["appointment_date"] == date
+        }
+        return {
+            "total": len(filtered),
+            "appointments": filtered
+        }
     
-    for appt_id, appt in APPOINTMENTS.items():
-        if date and appt["appointment_date"] != date:
-            continue
-            
-        appointments_list.append(AppointmentDetail(appointment_id=appt_id, **appt))
-    
-    appointments_list.sort(key=lambda x: (x.appointment_date, x.time))
-    
-    return AllAppointmentsResponse(total=len(appointments_list), appointments=appointments_list)
+    return {
+        "total": len(APPOINTMENTS),
+        "appointments": APPOINTMENTS
+    }
 
 
 @app.put("/appointments/{appointment_id}", response_model=UpdateResponse)
