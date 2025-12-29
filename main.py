@@ -219,16 +219,18 @@ def create_appointment(req: BookingRequest):
 
 
 @app.get("/appointments", response_model=AllAppointmentsResponse)
-def get_appointments(date: Optional[str] = None):
+def get_appointments(date: Optional[str] = None, phone: Optional[str] = None):
     """
-    📋 Get all appointments (optionally filter by date)
+    📋 Get all appointments (optionally filter by date and/or phone)
     
-    Example: /appointments?date=2026-01-20
+    Example: /appointments?date=2026-01-20&phone=0791234567
     """
     appointments_list = []
     
     for appt_id, appt in APPOINTMENTS.items():
         if date and appt["appointment_date"] != date:
+            continue
+        if phone and appt["phone"] != phone:
             continue
             
         appointments_list.append(AppointmentDetail(appointment_id=appt_id, **appt))
