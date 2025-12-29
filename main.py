@@ -124,7 +124,7 @@ def check_slot_availability(service: str, appointment_date: str, start_time: str
             if overlap:
                 raise HTTPException(
                     status_code=409,
-                    detail=f"Time slots {', '.join(overlap)} are already booked on {appointment_date}"
+                    detail=f"Time slots {', '.join(sorted(overlap))} are already booked on {appointment_date}"
                 )
 
 def normalize_time(time_str: str) -> str:
@@ -312,3 +312,70 @@ def delete_appointment(appointment_id: str):
     save_appointments(APPOINTMENTS)
     
     return DeleteResponse(success=True, message="Appointment cancelled successfully")
+
+
+@app.get("/available-slots")
+def get_available_slots(date: str, service: str = "Default"):
+    """
+    📅 Get available time slots for a specific date and service
+    
+    Returns only unbooked slots that can accommodate the service duration
+    Example: /available-slots?date=2026-01-20&service=Root Canal
+    """
+    # Check if date exists in schedule
+    if date not in SCHEDULE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No appointments available on {date}. Please check available dates."
+        )
+    
+    # Get all scheduled slots for the date
+    all_slots = SCHEDULE[date]
+    
+    # Get service duration
+    duration = get_service_duration(service)
+    slots_needed = duration // 30
+    
+    # Find all booked slots for this date
+    booked_slots = set()
+    for appt_id, appt in APPOINTMENTS.items():
+        if appt["appointment_date"] == date:
+            # Calculate all slots occupied by this appointment
+            occupied_slots = calculate_required_slots(appt["service"], appt["time"])
+            booked_slots.update(occupied_slots)
+    
+    # Find available start times that can accommodate the service duration
+    available_start_times = []
+    for i, start_slot in enumerate(all_slots):
+        # Check if we have enough consecutive slots from this start time
+        required_slots = []
+        current_time = datetime.strptime(start_slot, "%H:%M")
+        
+        can_book = True
+        for j in range(slots_needed):
+            slot_time = current_time.strftime("%H:%M")
+            
+            # Check if this slot exists in schedule
+            if slot_time not in all_slots:
+                can_book = False
+                break
+            
+            # Check if this slot is already booked
+            if slot_time in booked_slots:
+                can_book = False
+                break
+            
+            required_slots.append(slot_time)
+            current_time += timedelta(minutes=30)
+        
+        if can_book:
+            available_start_times.append(start_slot)
+    
+    return {
+        "date": date,
+        "service": service,
+        "duration_minutes": duration,
+        "slots_needed": slots_needed,
+        "total_available": len(available_start_times),
+        "available_times": available_start_times
+    }
