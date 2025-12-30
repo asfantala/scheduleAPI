@@ -26,6 +26,7 @@ class BookingRequest(BaseModel):
     phone: str
     appointment_date: str
     time: str
+    dentist: Optional[str] = None  # If not specified, auto-assign available dentist
     email: Optional[str] = "no-email@clinic.com"
     insurance_provider: Optional[str] = "No Insurance"
     notes: Optional[str] = ""
@@ -38,6 +39,7 @@ class UpdateRequest(BaseModel):
     appointment_id: str
     appointment_date: Optional[str] = None
     time: Optional[str] = None
+    dentist: Optional[str] = None
     insurance_provider: Optional[str] = None
     notes: Optional[str] = None
 
@@ -57,6 +59,7 @@ class AppointmentDetail(BaseModel):
     email: str
     appointment_date: str
     time: str
+    dentist: Optional[str] = None
     insurance_provider: Optional[str] = None
     notes: Optional[str] = None
 

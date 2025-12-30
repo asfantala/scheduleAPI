@@ -46,6 +46,7 @@ APPOINTMENTS = {
         "email": "sarah.j@example.com",
         "appointment_date": "2026-01-20",
         "time": "09:00",
+        "dentist": "Dr. Sarah Ahmed",
         "insurance_provider": "BlueCross",
         "notes": "Regular checkup"
     },
@@ -56,6 +57,7 @@ APPOINTMENTS = {
         "email": "ahmed@example.com",
         "appointment_date": "2026-01-20",
         "time": "14:00",
+        "dentist": "Dr. Mohammad Hassan",
         "insurance_provider": "HealthPlus",
         "notes": "Follow-up appointment"
     },
@@ -66,6 +68,7 @@ APPOINTMENTS = {
         "email": "layla.h@example.com",
         "appointment_date": "2026-01-21",
         "time": "10:00",
+        "dentist": "Dr. Layla Ibrahim",
         "insurance_provider": "No Insurance",
         "notes": "First visit"
     },
@@ -76,6 +79,7 @@ APPOINTMENTS = {
         "email": "mohammad.k@example.com",
         "appointment_date": "2026-01-21",
         "time": "14:30",
+        "dentist": "Dr. Sarah Ahmed",
         "insurance_provider": "MediCare",
         "notes": "Cavity on upper right molar"
     },
@@ -86,6 +90,7 @@ APPOINTMENTS = {
         "email": "rania.s@example.com",
         "appointment_date": "2026-01-22",
         "time": "09:30",
+        "dentist": "Dr. Mohammad Hassan",
         "insurance_provider": "BlueCross",
         "notes": "Annual checkup"
     },
@@ -96,6 +101,7 @@ APPOINTMENTS = {
         "email": "karim.n@example.com",
         "appointment_date": "2026-01-22",
         "time": "13:00",
+        "dentist": "Dr. Layla Ibrahim",
         "insurance_provider": "HealthPlus",
         "notes": "Wisdom tooth removal"
     },
@@ -106,6 +112,7 @@ APPOINTMENTS = {
         "email": "nour.k@example.com",
         "appointment_date": "2026-01-26",
         "time": "10:30",
+        "dentist": "Dr. Sarah Ahmed",
         "insurance_provider": "No Insurance",
         "notes": "Deep cleaning requested"
     },
@@ -116,6 +123,7 @@ APPOINTMENTS = {
         "email": "omar.f@example.com",
         "appointment_date": "2026-01-27",
         "time": "09:00",
+        "dentist": "Dr. Mohammad Hassan",
         "insurance_provider": "MediCare",
         "notes": "Severe tooth pain"
     },
@@ -126,6 +134,7 @@ APPOINTMENTS = {
         "email": "dina.m@example.com",
         "appointment_date": "2026-01-28",
         "time": "15:00",
+        "dentist": "Dr. Layla Ibrahim",
         "insurance_provider": "BlueCross",
         "notes": "Wedding preparation"
     },
@@ -136,6 +145,7 @@ APPOINTMENTS = {
         "email": "tariq.z@example.com",
         "appointment_date": "2026-01-29",
         "time": "13:30",
+        "dentist": "Dr. Sarah Ahmed",
         "insurance_provider": "HealthPlus",
         "notes": "Braces consultation"
     }

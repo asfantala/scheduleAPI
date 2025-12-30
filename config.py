@@ -17,6 +17,30 @@ SERVICE_DURATION = {
     "Default": 30  # Default duration for unlisted services
 }
 
+# Available dentists
+DENTISTS = [
+    "Dr. Sarah Ahmed",
+    "Dr. Mohammad Hassan",
+    "Dr. Layla Ibrahim"
+]
+
+# Dentist working schedules
+# weekday: Monday=0, Tuesday=1, Wednesday=2, Thursday=3, Friday=4, Saturday=5, Sunday=6
+DENTIST_SCHEDULES = {
+    "Dr. Sarah Ahmed": {
+        "working_days": [6, 0, 1, 2],  # Sunday, Monday, Tuesday, Wednesday
+        "vacation_dates": []  # Add specific dates like "2026-02-15"
+    },
+    "Dr. Mohammad Hassan": {
+        "working_days": [0, 1, 2, 3],  # Monday, Tuesday, Wednesday, Thursday
+        "vacation_dates": []
+    },
+    "Dr. Layla Ibrahim": {
+        "working_days": [6, 1, 2, 3],  # Sunday, Tuesday, Wednesday, Thursday
+        "vacation_dates": []
+    }
+}
+
 # Business hours
 CLINIC_OPEN_TIME = "09:00"
 CLINIC_CLOSE_TIME = "18:00"
