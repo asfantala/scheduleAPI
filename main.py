@@ -323,7 +323,7 @@ def update_appointment(req: UpdateRequest, phone: str, date: str):
     ✏️ Update appointments by phone and date
     
     Internally searches for appointments matching phone and date, then updates them
-    Can update: appointment_date, time, dentist, insurance_provider, notes
+    Can update: service, patient_name, email, appointment_date, time, dentist, insurance_provider, notes
     Example: PUT /appointments?phone=0791234567&date=2026-01-20
     """
     # Search for appointments by phone and date
@@ -337,10 +337,11 @@ def update_appointment(req: UpdateRequest, phone: str, date: str):
         appointment = APPOINTMENTS[appt_id]
         
         # Get current or updated values
+        service = req.service if req.service else appointment["service"]
         new_date = req.appointment_date if req.appointment_date else appointment["appointment_date"]
         new_time = normalize_time(req.time) if req.time else appointment["time"]
         new_dentist = req.dentist if req.dentist else appointment.get("dentist")
-        service = appointment["service"]
+        new_email = req.email if req.email else appointment["email"]
         
         # Validate dentist if being changed
         if req.dentist:
@@ -356,15 +357,21 @@ def update_appointment(req: UpdateRequest, phone: str, date: str):
                     detail=f"{req.dentist} is not available on {new_date} (not working or on vacation)"
                 )
         
-        # If date, time, or dentist is being changed, validate
-        if req.appointment_date or req.time or req.dentist:
+        # If date, time, dentist, or service is being changed, validate
+        if req.appointment_date or req.time or req.dentist or req.service:
             validate_booking_time(new_date, new_time)
             check_patient_existing_appointments(
-                appointment["phone"], appointment["email"], new_date, new_time, exclude_id=appt_id
+                appointment["phone"], new_email, new_date, new_time, exclude_id=appt_id
             )
             check_slot_availability(service, new_date, new_time, dentist=new_dentist, exclude_id=appt_id)
         
         # Update fields
+        if req.service:
+            appointment["service"] = req.service
+        if req.patient_name:
+            appointment["patient_name"] = req.patient_name
+        if req.email:
+            appointment["email"] = req.email
         if req.appointment_date:
             appointment["appointment_date"] = req.appointment_date
         if req.time:

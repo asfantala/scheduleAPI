@@ -36,6 +36,9 @@ class BookingResponse(BaseModel):
     appointment_id: str
 
 class UpdateRequest(BaseModel):
+    service: Optional[str] = None
+    patient_name: Optional[str] = None
+    email: Optional[str] = None
     appointment_date: Optional[str] = None
     time: Optional[str] = None
     dentist: Optional[str] = None
