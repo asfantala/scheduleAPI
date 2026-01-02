@@ -97,16 +97,5 @@
     "dentist": "Dr. Sarah Ahmed",
     "insurance_provider": "HealthPlus",
     "notes": "Braces consultation"
-  },
-  "93f69fb1-26f6-42ed-8d2a-68185ea9b4fa": {
-    "service": "Dental Cleaning",
-    "patient_name": "Sarah Johnson",
-    "phone": "0791234567",
-    "email": "sarah.j@example.com",
-    "appointment_date": "2026-01-20",
-    "time": "09:00",
-    "dentist": "Dr. Sarah Ahmed",
-    "insurance_provider": "BlueCross",
-    "notes": "Regular checkup"
   }
 }

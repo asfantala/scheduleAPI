@@ -207,6 +207,26 @@ def normalize_time(time_str: str) -> str:
         # If parsing fails, return as-is
         return time_str
 
+
+def normalize_phone(phone: str) -> str:
+    """Normalize phone numbers to local format starting with 0.
+
+    Rules:
+    - Remove all non-digit characters
+    - If number starts with country code '962', convert to leading '0' (e.g. 9627... -> 07...)
+    - If number has 9 digits (missing leading 0), prefix with '0'
+    """
+    if not phone:
+        return phone
+    cleaned = re.sub(r'\D', '', str(phone))
+    # Convert Jordan country code 962 -> leading 0
+    if cleaned.startswith('962') and len(cleaned) > 3:
+        cleaned = '0' + cleaned[3:]
+    # If missing leading zero (9 digits), add it
+    if len(cleaned) == 9:
+        cleaned = '0' + cleaned
+    return cleaned
+
 def find_available_dentist(service: str, appointment_date: str, start_time: str) -> str:
     """Find an available dentist for the requested time slot"""
     for dentist in DENTISTS:
@@ -229,16 +249,26 @@ def find_available_dentist(service: str, appointment_date: str, start_time: str)
 def search_appointments_by_phone(phone: str) -> list:
     """Search and return all appointment IDs for a phone number"""
     appointment_ids = []
+    cleaned = normalize_phone(phone)
     for appt_id, appt in APPOINTMENTS.items():
-        if appt["phone"] == phone:
+        try:
+            appt_phone = normalize_phone(appt.get("phone", ""))
+        except Exception:
+            appt_phone = appt.get("phone", "")
+        if appt_phone == cleaned:
             appointment_ids.append(appt_id)
     return appointment_ids
 
 def search_appointments_by_phone_and_date(phone: str, date: str) -> list:
     """Search and return all appointment IDs for a phone number and date"""
     appointment_ids = []
+    cleaned = normalize_phone(phone)
     for appt_id, appt in APPOINTMENTS.items():
-        if appt["phone"] == phone and appt["appointment_date"] == date:
+        try:
+            appt_phone = normalize_phone(appt.get("phone", ""))
+        except Exception:
+            appt_phone = appt.get("phone", "")
+        if appt_phone == cleaned and appt.get("appointment_date") == date:
             appointment_ids.append(appt_id)
     return appointment_ids
 
@@ -282,6 +312,8 @@ def create_appointment(req: BookingRequest):
     """
     appointment_date = req.appointment_date
     appointment_time = req.time
+    # Normalize incoming phone early and use normalized form for storage and checks
+    normalized_phone = normalize_phone(req.phone)
 
     # Validate service name
     validate_service(req.service)
@@ -291,7 +323,7 @@ def create_appointment(req: BookingRequest):
 
     # Validate business rules
     validate_booking_time(appointment_date, normalized_time)
-    check_patient_existing_appointments(req.phone, req.email, appointment_date, normalized_time)
+    check_patient_existing_appointments(normalized_phone, req.email, appointment_date, normalized_time)
     
     # Handle dentist assignment
     # Treat empty string as None for dentist
@@ -324,7 +356,7 @@ def create_appointment(req: BookingRequest):
     APPOINTMENTS[appointment_id] = {
         "service": req.service,
         "patient_name": req.patient_name,
-        "phone": req.phone,
+        "phone": normalized_phone,
         "email": req.email,
         "appointment_date": appointment_date,
         "time": normalized_time,

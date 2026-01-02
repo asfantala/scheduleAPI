@@ -32,20 +32,22 @@ class BookingRequest(BaseModel):
     insurance_provider: Optional[str] = "No Insurance"
     notes: Optional[str] = ""
 
-    @field_validator('phone')
+    @field_validator('phone', mode='before')
     @classmethod
     def validate_phone(cls, v):
-        """Validate phone number format"""
-        if not v:
+        """Coerce and validate phone number format (accept ints too)"""
+        if v is None or (isinstance(v, str) and not v.strip()):
             raise ValueError('Phone number is required')
+        # Coerce non-string inputs (e.g., int) to string
+        v_str = str(v)
         # Remove spaces, dashes, parentheses, and plus signs
-        cleaned = re.sub(r'[\s\-\(\)\+]', '', v)
+        cleaned = re.sub(r'[\s\-\(\)\+]', '', v_str)
         # Check if it's at least 9 digits (more lenient)
         if len(cleaned) < 9:
             raise ValueError('Phone number must be at least 9 digits')
         if not cleaned.isdigit():
             raise ValueError('Phone number must contain only digits')
-        return v
+        return cleaned
 
     @field_validator('email')
     @classmethod
