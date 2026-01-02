@@ -219,8 +219,10 @@ def normalize_phone(phone: str) -> str:
     if not phone:
         return phone
     cleaned = re.sub(r'\D', '', str(phone))
-    # Convert Jordan country code 962 -> leading 0
-    if cleaned.startswith('962') and len(cleaned) > 3:
+    # Handle common country-code forms for Jordan: +962, 00962, 962
+    if cleaned.startswith('00962') and len(cleaned) > 5:
+        cleaned = '0' + cleaned[5:]
+    elif cleaned.startswith('962') and len(cleaned) > 3:
         cleaned = '0' + cleaned[3:]
     # If missing leading zero (9 digits), add it
     if len(cleaned) == 9:
@@ -257,6 +259,20 @@ def search_appointments_by_phone(phone: str) -> list:
             appt_phone = appt.get("phone", "")
         if appt_phone == cleaned:
             appointment_ids.append(appt_id)
+            continue
+
+        # Fallback: match by suffix (last 9 or 10 digits) to handle country-code or missing leading zero
+        if cleaned and appt_phone:
+            try:
+                if len(cleaned) >= 9 and cleaned[-9:] == appt_phone[-9:]:
+                    appointment_ids.append(appt_id)
+                    continue
+                if len(cleaned) >= 10 and cleaned[-10:] == appt_phone[-10:]:
+                    appointment_ids.append(appt_id)
+                    continue
+            except Exception:
+                pass
+
     return appointment_ids
 
 def search_appointments_by_phone_and_date(phone: str, date: str) -> list:
@@ -268,8 +284,26 @@ def search_appointments_by_phone_and_date(phone: str, date: str) -> list:
             appt_phone = normalize_phone(appt.get("phone", ""))
         except Exception:
             appt_phone = appt.get("phone", "")
-        if appt_phone == cleaned and appt.get("appointment_date") == date:
+
+        if appt.get("appointment_date") != date:
+            continue
+
+        if appt_phone == cleaned:
             appointment_ids.append(appt_id)
+            continue
+
+        # Fallback: match by suffix (last 9 or 10 digits)
+        if cleaned and appt_phone:
+            try:
+                if len(cleaned) >= 9 and cleaned[-9:] == appt_phone[-9:]:
+                    appointment_ids.append(appt_id)
+                    continue
+                if len(cleaned) >= 10 and cleaned[-10:] == appt_phone[-10:]:
+                    appointment_ids.append(appt_id)
+                    continue
+            except Exception:
+                pass
+
     return appointment_ids
 
 app = FastAPI(
@@ -432,14 +466,35 @@ async def update_appointment(req: UpdateRequest, phone: Optional[str] = Query(No
         except Exception:
             lookup_phone = None
 
-    if not lookup_phone:
-        raise HTTPException(status_code=422, detail="Phone must be provided either as query parameter or in request body")
+    # Note: don't require phone here — we support fallback lookups by email or patient_name
 
     # Search for appointments by phone and date
     appointment_ids = search_appointments_by_phone_and_date(lookup_phone, target_date)
 
+    # If no appointment by phone, try email fallback
+    if not appointment_ids and req.email:
+        for appt_id, appt in APPOINTMENTS.items():
+            if appt.get("appointment_date") == target_date and appt.get("email") == req.email:
+                appointment_ids.append(appt_id)
+                break
+
+    # If still not found, try patient_name fallback (case-insensitive)
+    if not appointment_ids and req.patient_name:
+        name_lower = req.patient_name.strip().lower()
+        for appt_id, appt in APPOINTMENTS.items():
+            if appt.get("appointment_date") == target_date and appt.get("patient_name", "").strip().lower() == name_lower:
+                appointment_ids.append(appt_id)
+                break
+
     if not appointment_ids:
-        raise HTTPException(status_code=404, detail=f"No appointments found for phone {lookup_phone} on {target_date}")
+        # Collect sample stored phones for this date to help debugging
+        stored_phones = []
+        for appt in APPOINTMENTS.values():
+            if appt.get("appointment_date") == target_date:
+                stored_phones.append(normalize_phone(appt.get("phone", "")))
+        stored_phones = sorted(set([p for p in stored_phones if p]))
+        sample = ", ".join(stored_phones[:5]) if stored_phones else "<none>"
+        raise HTTPException(status_code=404, detail=f"No appointments found for phone {lookup_phone} on {target_date}. Stored phones on that date: {sample}")
 
     # Find the FIRST appointment on that date (earliest time)
     first_appointment_id = None
@@ -521,18 +576,36 @@ async def update_appointment(req: UpdateRequest, phone: Optional[str] = Query(No
 
 
 @app.delete("/appointments", response_model=DeleteResponse)
-def delete_appointment(phone: str):
+def delete_appointment(phone: Optional[str] = Query(None), email: Optional[str] = Query(None), patient_name: Optional[str] = Query(None)):
     """
     Delete the NEXT upcoming appointment for a phone number
 
     Searches for all appointments by phone, then deletes only the earliest future appointment.
     Example: DELETE /appointments?phone=0791234567
     """
-    # Search for appointments by phone
-    appointment_ids = search_appointments_by_phone(phone)
+    # Search for appointments by phone (if provided)
+    appointment_ids = []
+    if phone:
+        appointment_ids = search_appointments_by_phone(phone)
+
+    # Fallback: search by email if phone lookup failed and email provided
+    if not appointment_ids and email:
+        for appt_id, appt in APPOINTMENTS.items():
+            if appt.get("email") == email:
+                appointment_ids.append(appt_id)
+
+    # Fallback: search by patient_name if still not found
+    if not appointment_ids and patient_name:
+        name_lower = patient_name.strip().lower()
+        for appt_id, appt in APPOINTMENTS.items():
+            if appt.get("patient_name", "").strip().lower() == name_lower:
+                appointment_ids.append(appt_id)
 
     if not appointment_ids:
-        raise HTTPException(status_code=404, detail="No appointments found for this phone number")
+        # Include stored phones to help debugging
+        stored_phones = sorted(set([normalize_phone(appt.get("phone", "")) for appt in APPOINTMENTS.values() if appt.get("phone")]))
+        sample = ", ".join(stored_phones[:5]) if stored_phones else "<none>"
+        raise HTTPException(status_code=404, detail=f"No appointments found for this phone/email/name. Stored phones: {sample}")
 
     # Find the next upcoming appointment (earliest future appointment)
     now = datetime.now()
