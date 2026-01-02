@@ -291,6 +291,16 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     logging.error("Validation error for %s %s: body=%s, errors=%s", request.method, request.url, body, exc.errors())
     return JSONResponse(status_code=422, content={"detail": exc.errors(), "body": body})
 
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    try:
+        body = await request.json()
+    except Exception:
+        body = "<could not read body>"
+    logging.error("HTTPException for %s %s: status=%s detail=%s body=%s", request.method, request.url, exc.status_code, exc.detail, body)
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail, "body": body})
+
 # Add CORS middleware to allow requests from HeyBreez and other sources
 app.add_middleware(
     CORSMiddleware,
