@@ -16,17 +16,26 @@ from dateutil import parser
 from datetime import datetime, timedelta
 import re
 
+def validate_service(service: str) -> None:
+    """Validate that service name is in the allowed list"""
+    if service not in SERVICE_DURATION or service == "Default":
+        valid_services = [s for s in SERVICE_DURATION.keys() if s != "Default"]
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid service '{service}'. Valid services: {', '.join(valid_services)}"
+        )
+
 def is_dentist_available(dentist: str, date_str: str) -> bool:
     """Check if dentist is working on a specific date"""
     if dentist not in DENTIST_SCHEDULES:
         return False
-    
+
     schedule = DENTIST_SCHEDULES[dentist]
-    
+
     # Check if date is in vacation
     if date_str in schedule["vacation_dates"]:
         return False
-    
+
     # Check if weekday is a working day
     try:
         date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
@@ -240,16 +249,19 @@ app = FastAPI(
 def create_appointment(req: BookingRequest):
     """
     Book a new dental appointment
-    
+
     Required: service, patient_name, phone, appointment_date, time
     Optional: dentist (auto-assigned if not specified)
     """
     appointment_date = req.appointment_date
     appointment_time = req.time
-    
+
+    # Validate service name
+    validate_service(req.service)
+
     # Normalize time format
     normalized_time = normalize_time(appointment_time)
-    
+
     # Validate business rules
     validate_booking_time(appointment_date, normalized_time)
     check_patient_existing_appointments(req.phone, req.email, appointment_date, normalized_time)
@@ -320,112 +332,153 @@ def get_appointments(date: Optional[str] = None, phone: Optional[str] = None, de
 @app.put("/appointments", response_model=UpdateResponse)
 def update_appointment(req: UpdateRequest, phone: str, date: str):
     """
-    ✏️ Update appointments by phone and date
-    
-    Internally searches for appointments matching phone and date, then updates them
+    Update the FIRST appointment on a specific date for a phone number
+
+    Searches for appointments by phone and date, then updates only the earliest appointment on that date.
     Can update: service, patient_name, email, appointment_date, time, dentist, insurance_provider, notes
     Example: PUT /appointments?phone=0791234567&date=2026-01-20
     """
     # Search for appointments by phone and date
     appointment_ids = search_appointments_by_phone_and_date(phone, date)
-    
+
     if not appointment_ids:
         raise HTTPException(status_code=404, detail=f"No appointments found for phone {phone} on {date}")
-    
-    # Update all matching appointments
+
+    # Find the FIRST appointment on that date (earliest time)
+    first_appointment_id = None
+    first_appointment_time = None
+
     for appt_id in appointment_ids:
         appointment = APPOINTMENTS[appt_id]
-        
-        # Get current or updated values
-        service = req.service if req.service else appointment["service"]
-        new_date = req.appointment_date if req.appointment_date else appointment["appointment_date"]
-        new_time = normalize_time(req.time) if req.time else appointment["time"]
-        new_dentist = req.dentist if req.dentist else appointment.get("dentist")
-        new_email = req.email if req.email else appointment["email"]
-        
-        # Validate dentist if being changed
-        if req.dentist:
-            if req.dentist not in DENTISTS:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Dentist '{req.dentist}' not found. Available dentists: {', '.join(DENTISTS)}"
-                )
-            # Check if dentist is working on the date
-            if not is_dentist_available(req.dentist, new_date):
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"{req.dentist} is not available on {new_date} (not working or on vacation)"
-                )
-        
-        # If date, time, dentist, or service is being changed, validate
-        if req.appointment_date or req.time or req.dentist or req.service:
-            validate_booking_time(new_date, new_time)
-            check_patient_existing_appointments(
-                appointment["phone"], new_email, new_date, new_time, exclude_id=appt_id
+        appt_time = appointment["time"]
+
+        if first_appointment_time is None or appt_time < first_appointment_time:
+            first_appointment_id = appt_id
+            first_appointment_time = appt_time
+
+    # Update only the first appointment
+    appointment = APPOINTMENTS[first_appointment_id]
+
+    # Validate service if being changed
+    if req.service:
+        validate_service(req.service)
+
+    # Get current or updated values
+    service = req.service if req.service else appointment["service"]
+    new_date = req.appointment_date if req.appointment_date else appointment["appointment_date"]
+    new_time = normalize_time(req.time) if req.time else appointment["time"]
+    new_dentist = req.dentist if req.dentist else appointment.get("dentist")
+    new_email = req.email if req.email else appointment["email"]
+
+    # Validate dentist if being changed
+    if req.dentist:
+        if req.dentist not in DENTISTS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Dentist '{req.dentist}' not found. Available dentists: {', '.join(DENTISTS)}"
             )
-            check_slot_availability(service, new_date, new_time, dentist=new_dentist, exclude_id=appt_id)
-        
-        # Update fields
-        if req.service:
-            appointment["service"] = req.service
-        if req.patient_name:
-            appointment["patient_name"] = req.patient_name
-        if req.email:
-            appointment["email"] = req.email
-        if req.appointment_date:
-            appointment["appointment_date"] = req.appointment_date
-        if req.time:
-            appointment["time"] = new_time
-        if req.dentist:
-            appointment["dentist"] = req.dentist
-        if req.insurance_provider is not None:
-            appointment["insurance_provider"] = req.insurance_provider
-        if req.notes is not None:
-            appointment["notes"] = req.notes
-    
+        # Check if dentist is working on the date
+        if not is_dentist_available(req.dentist, new_date):
+            raise HTTPException(
+                status_code=400,
+                detail=f"{req.dentist} is not available on {new_date} (not working or on vacation)"
+            )
+
+    # If date, time, dentist, or service is being changed, validate
+    if req.appointment_date or req.time or req.dentist or req.service:
+        validate_booking_time(new_date, new_time)
+        check_patient_existing_appointments(
+            appointment["phone"], new_email, new_date, new_time, exclude_id=first_appointment_id
+        )
+        check_slot_availability(service, new_date, new_time, dentist=new_dentist, exclude_id=first_appointment_id)
+
+    # Store old values for the response message
+    old_date = appointment["appointment_date"]
+    old_time = appointment["time"]
+
+    # Update fields
+    if req.service:
+        appointment["service"] = req.service
+    if req.patient_name:
+        appointment["patient_name"] = req.patient_name
+    if req.email:
+        appointment["email"] = req.email
+    if req.appointment_date:
+        appointment["appointment_date"] = req.appointment_date
+    if req.time:
+        appointment["time"] = new_time
+    if req.dentist:
+        appointment["dentist"] = req.dentist
+    if req.insurance_provider is not None:
+        appointment["insurance_provider"] = req.insurance_provider
+    if req.notes is not None:
+        appointment["notes"] = req.notes
+
     save_appointments(APPOINTMENTS)
-    return UpdateResponse(success=True, message=f"{len(appointment_ids)} appointment(s) updated successfully")
+    return UpdateResponse(
+        success=True,
+        message=f"Appointment updated: {old_date} at {old_time} → {appointment['appointment_date']} at {appointment['time']}"
+    )
 
 
 @app.delete("/appointments", response_model=DeleteResponse)
 def delete_appointment(phone: str):
     """
-  
+    Delete the NEXT upcoming appointment for a phone number
+
+    Searches for all appointments by phone, then deletes only the earliest future appointment.
     Example: DELETE /appointments?phone=0791234567
     """
     # Search for appointments by phone
     appointment_ids = search_appointments_by_phone(phone)
-    
+
     if not appointment_ids:
         raise HTTPException(status_code=404, detail="No appointments found for this phone number")
-    
-    # Check cancellation policy for each
+
+    # Find the next upcoming appointment (earliest future appointment)
+    now = datetime.now()
+    next_appointment_id = None
+    next_appointment_datetime = None
+    next_appointment_data = None
+
     for appt_id in appointment_ids:
         appointment = APPOINTMENTS[appt_id]
         try:
             appt_datetime = datetime.strptime(
                 f"{appointment['appointment_date']} {appointment['time']}", "%Y-%m-%d %H:%M"
             )
-            min_cancel_time = appt_datetime - timedelta(hours=CANCELLATION_HOURS)
-            
-            if datetime.now() > min_cancel_time:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Appointment on {appointment['appointment_date']} at {appointment['time']} must be cancelled at least {CANCELLATION_HOURS} hours in advance"
-                )
-        except HTTPException:
-            raise
+
+            # Only consider future appointments
+            if appt_datetime > now:
+                if next_appointment_datetime is None or appt_datetime < next_appointment_datetime:
+                    next_appointment_id = appt_id
+                    next_appointment_datetime = appt_datetime
+                    next_appointment_data = appointment
         except Exception:
-            pass
-    
-    # Delete all appointments
-    deleted_count = 0
-    for appt_id in appointment_ids:
-        del APPOINTMENTS[appt_id]
-        deleted_count += 1
-    
+            continue
+
+    if not next_appointment_id:
+        raise HTTPException(
+            status_code=404,
+            detail="No upcoming appointments found for this phone number. All appointments are in the past."
+        )
+
+    # Check cancellation policy for the next appointment
+    min_cancel_time = next_appointment_datetime - timedelta(hours=CANCELLATION_HOURS)
+    if now > min_cancel_time:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Appointment on {next_appointment_data['appointment_date']} at {next_appointment_data['time']} must be cancelled at least {CANCELLATION_HOURS} hours in advance"
+        )
+
+    # Delete only the next upcoming appointment
+    del APPOINTMENTS[next_appointment_id]
     save_appointments(APPOINTMENTS)
-    return DeleteResponse(success=True, message=f"{deleted_count} appointment(s) cancelled successfully")
+
+    return DeleteResponse(
+        success=True,
+        message=f"Appointment cancelled: {next_appointment_data['appointment_date']} at {next_appointment_data['time']} with {next_appointment_data['dentist']}"
+    )
 
 
 @app.get("/available-slots")

@@ -1,5 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional, List
+import re
 
 class AvailabilityRequest(BaseModel):
     service: str
@@ -30,6 +31,38 @@ class BookingRequest(BaseModel):
     email: Optional[str] = "no-email@clinic.com"
     insurance_provider: Optional[str] = "No Insurance"
     notes: Optional[str] = ""
+
+    @field_validator('phone')
+    @classmethod
+    def validate_phone(cls, v):
+        """Validate phone number format"""
+        if not v:
+            raise ValueError('Phone number is required')
+        # Remove spaces and dashes
+        cleaned = re.sub(r'[\s\-]', '', v)
+        # Check if it's at least 10 digits
+        if len(cleaned) < 10 or not cleaned.isdigit():
+            raise ValueError('Phone number must be at least 10 digits')
+        return v
+
+    @field_validator('email')
+    @classmethod
+    def validate_email(cls, v):
+        """Validate email format"""
+        if v and v != "no-email@clinic.com":
+            # Basic email validation
+            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+            if not re.match(email_pattern, v):
+                raise ValueError('Invalid email format')
+        return v
+
+    @field_validator('patient_name')
+    @classmethod
+    def validate_name(cls, v):
+        """Validate patient name is not empty"""
+        if not v or not v.strip():
+            raise ValueError('Patient name is required')
+        return v.strip()
 
 class BookingResponse(BaseModel):
     success: bool
