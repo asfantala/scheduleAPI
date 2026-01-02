@@ -79,11 +79,23 @@ class UpdateRequest(BaseModel):
     service: Optional[str] = None
     patient_name: Optional[str] = None
     email: Optional[str] = None
+    phone: Optional[str] = None
     appointment_date: Optional[str] = None
     time: Optional[str] = None
     dentist: Optional[str] = None
     insurance_provider: Optional[str] = None
     notes: Optional[str] = None
+
+    @field_validator('phone', mode='before')
+    @classmethod
+    def validate_update_phone(cls, v):
+        if v is None:
+            return v
+        v_str = str(v)
+        cleaned = re.sub(r'[\s\-\(\)\+]', '', v_str)
+        if not cleaned:
+            return None
+        return cleaned
 
 class UpdateResponse(BaseModel):
     success: bool

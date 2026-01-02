@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.requests import Request
@@ -392,7 +392,7 @@ def get_appointments(date: Optional[str] = None, phone: Optional[str] = None, de
 
 
 @app.put("/appointments", response_model=UpdateResponse)
-def update_appointment(req: UpdateRequest, phone: str, date: str):
+async def update_appointment(req: UpdateRequest, phone: Optional[str] = Query(None), date: Optional[str] = Query(None), appointment_date: Optional[str] = Query(None, alias="appointment_date"), request: Request = None):
     """
     Update the FIRST appointment on a specific date for a phone number
 
@@ -400,11 +400,36 @@ def update_appointment(req: UpdateRequest, phone: str, date: str):
     Can update: service, patient_name, email, appointment_date, time, dentist, insurance_provider, notes
     Example: PUT /appointments?phone=0791234567&date=2026-01-20
     """
+    # Accept either `date` or `appointment_date` query param for compatibility
+    target_date = date or appointment_date
+    if not target_date:
+        raise HTTPException(status_code=422, detail="Query parameter 'date' or 'appointment_date' is required")
+
+    # Determine lookup phone: prefer body `phone`, then query param, then tolerant raw body keys like 'phone '
+    lookup_phone = None
+    if req.phone:
+        lookup_phone = req.phone
+    elif phone:
+        lookup_phone = phone
+    else:
+        try:
+            raw = await request.json()
+            if isinstance(raw, dict):
+                for k, v in raw.items():
+                    if k.strip().lower() == 'phone' and v:
+                        lookup_phone = v
+                        break
+        except Exception:
+            lookup_phone = None
+
+    if not lookup_phone:
+        raise HTTPException(status_code=422, detail="Phone must be provided either as query parameter or in request body")
+
     # Search for appointments by phone and date
-    appointment_ids = search_appointments_by_phone_and_date(phone, date)
+    appointment_ids = search_appointments_by_phone_and_date(lookup_phone, target_date)
 
     if not appointment_ids:
-        raise HTTPException(status_code=404, detail=f"No appointments found for phone {phone} on {date}")
+        raise HTTPException(status_code=404, detail=f"No appointments found for phone {lookup_phone} on {target_date}")
 
     # Find the FIRST appointment on that date (earliest time)
     first_appointment_id = None
@@ -461,6 +486,8 @@ def update_appointment(req: UpdateRequest, phone: str, date: str):
     # Update fields
     if req.service:
         appointment["service"] = req.service
+    if req.phone:
+        appointment["phone"] = normalize_phone(req.phone)
     if req.patient_name:
         appointment["patient_name"] = req.patient_name
     if req.email:
