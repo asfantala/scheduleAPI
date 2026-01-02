@@ -1,4 +1,8 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from starlette.requests import Request
+import logging
 from fastapi.middleware.cors import CORSMiddleware
 from models import (
     BookingRequest,
@@ -243,6 +247,19 @@ app = FastAPI(
     description="Simple API - Only 4 endpoints you need",
     version="1.0.0"
 )
+
+# Basic logging for debugging request validation issues
+logging.basicConfig(level=logging.INFO)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    try:
+        body = await request.json()
+    except Exception:
+        body = "<could not read body>"
+    logging.error("Validation error for %s %s: body=%s, errors=%s", request.method, request.url, body, exc.errors())
+    return JSONResponse(status_code=422, content={"detail": exc.errors(), "body": body})
 
 # Add CORS middleware to allow requests from HeyBreez and other sources
 app.add_middleware(

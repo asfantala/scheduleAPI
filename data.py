@@ -39,17 +39,6 @@ SCHEDULE = generate_schedule()
 
 # In-memory storage for appointments (with sample data)
 APPOINTMENTS = {
-    "sample-appt-001": {
-        "service": "Dental Cleaning",
-        "patient_name": "Sarah Johnson",
-        "phone": "0791234567",
-        "email": "sarah.j@example.com",
-        "appointment_date": "2026-01-20",
-        "time": "09:00",
-        "dentist": "Dr. Sarah Ahmed",
-        "insurance_provider": "BlueCross",
-        "notes": "Regular checkup"
-    },
     "sample-appt-002": {
         "service": "Root Canal",
         "patient_name": "Ahmed Ali",
