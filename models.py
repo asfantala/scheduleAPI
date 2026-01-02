@@ -38,22 +38,26 @@ class BookingRequest(BaseModel):
         """Validate phone number format"""
         if not v:
             raise ValueError('Phone number is required')
-        # Remove spaces and dashes
-        cleaned = re.sub(r'[\s\-]', '', v)
-        # Check if it's at least 10 digits
-        if len(cleaned) < 10 or not cleaned.isdigit():
-            raise ValueError('Phone number must be at least 10 digits')
+        # Remove spaces, dashes, parentheses, and plus signs
+        cleaned = re.sub(r'[\s\-\(\)\+]', '', v)
+        # Check if it's at least 9 digits (more lenient)
+        if len(cleaned) < 9:
+            raise ValueError('Phone number must be at least 9 digits')
+        if not cleaned.isdigit():
+            raise ValueError('Phone number must contain only digits')
         return v
 
     @field_validator('email')
     @classmethod
     def validate_email(cls, v):
-        """Validate email format"""
-        if v and v != "no-email@clinic.com":
-            # Basic email validation
-            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-            if not re.match(email_pattern, v):
-                raise ValueError('Invalid email format')
+        """Validate email format (lenient)"""
+        if not v:
+            return "no-email@clinic.com"  # Use default if empty
+        if v == "no-email@clinic.com":
+            return v
+        # More lenient email validation
+        if '@' not in v or '.' not in v:
+            raise ValueError('Invalid email format - must contain @ and .')
         return v
 
     @field_validator('patient_name')
@@ -62,6 +66,7 @@ class BookingRequest(BaseModel):
         """Validate patient name is not empty"""
         if not v or not v.strip():
             raise ValueError('Patient name is required')
+        # Allow any characters including Arabic, spaces, etc.
         return v.strip()
 
 class BookingResponse(BaseModel):

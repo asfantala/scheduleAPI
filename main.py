@@ -277,9 +277,12 @@ def create_appointment(req: BookingRequest):
     check_patient_existing_appointments(req.phone, req.email, appointment_date, normalized_time)
     
     # Handle dentist assignment
-    if req.dentist:
+    # Treat empty string as None for dentist
+    requested_dentist = req.dentist if req.dentist and req.dentist.strip() else None
+
+    if requested_dentist:
         # Validate requested dentist exists
-        if req.dentist not in DENTISTS:
+        if requested_dentist not in DENTISTS:
             raise HTTPException(
                 status_code=400,
                 detail=f"Dentist '{req.dentist}' not found. Available dentists: {', '.join(DENTISTS)}"
